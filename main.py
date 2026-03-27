@@ -1,4 +1,4 @@
-from telegram import Update
+ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import instaloader
 import time
@@ -12,9 +12,9 @@ monitoring = {}
 def is_active(username):
     try:
         instaloader.Profile.from_username(L.context, username)
-        return True
+        return True  # unavailable
     except:
-        return False
+        return False  # available
 
 def format_time(seconds):
     hrs = seconds // 3600
@@ -30,21 +30,22 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = context.args[0]
     chat_id = update.effective_chat.id
 
-    if username in monitoring:
-        await update.message.reply_text(f"⚠️ Already monitoring {username}")
-        return
+    current = is_active(username)
 
-    active = is_active(username)
+    monitoring[username] = {
+        "chat_id": chat_id,
+        "last_status": current,
+        "start_time": time.time()
+    }
 
-    if active:
-        await update.message.reply_text(f"✅ {username} is active")
+    if current:
+        await update.message.reply_text(
+            f"❌ {username} unavailable\n👀 Monitoring started..."
+        )
     else:
-        monitoring[username] = {
-            "chat_id": chat_id,
-            "last_status": False,
-            "start_time": time.time()
-        }
-        await update.message.reply_text(f"👀 Monitoring started for {username}")
+        await update.message.reply_text(
+            f"🟢 {username} available\n👀 Monitoring started..."
+        )
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -57,18 +58,7 @@ async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del monitoring[username]
         await update.message.reply_text(f"🛑 Stopped monitoring {username}")
     else:
-        await update.message.reply_text(f"❌ {username} not monitored")
-
-async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not monitoring:
-        await update.message.reply_text("📭 No usernames monitored")
-        return
-
-    msg = "📋 Monitoring list:\n"
-    for user in monitoring:
-        msg += f"- {user}\n"
-
-    await update.message.reply_text(msg)
+        await update.message.reply_text("Not monitoring this username")
 
 async def monitor_loop(app):
     while True:
@@ -76,29 +66,29 @@ async def monitor_loop(app):
             data = monitoring[username]
             current = is_active(username)
 
-            if current and not data["last_status"]:
+            if current != data["last_status"]:
                 elapsed = int(time.time() - data["start_time"])
-                await app.bot.send_message(
-                    data["chat_id"],
-                    f"🔥 {username} is ACTIVE!\n⏱ {format_time(elapsed)}"
-                )
-                data["last_status"] = True
 
-            elif not current and data["last_status"]:
-                await app.bot.send_message(
-                    data["chat_id"],
-                    f"❌ {username} became INACTIVE"
-                )
-                data["last_status"] = False
+                if current:
+                    await app.bot.send_message(
+                        data["chat_id"],
+                        f"🚫 {username} BANNED\n⏱ {format_time(elapsed)}"
+                    )
+                else:
+                    await app.bot.send_message(
+                        data["chat_id"],
+                        f"🏆 {username} UNBANNED 🎉\n⏱ {format_time(elapsed)}"
+                    )
+
+                data["last_status"] = current
                 data["start_time"] = time.time()
 
-        await asyncio.sleep(30)
+        await asyncio.sleep(1)
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("check", check))
 app.add_handler(CommandHandler("stop", stop))
-app.add_handler(CommandHandler("list", list_users))
 
 async def start_monitor(app):
     asyncio.create_task(monitor_loop(app))
