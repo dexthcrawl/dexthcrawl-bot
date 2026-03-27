@@ -1,4 +1,4 @@
- from telegram import Update
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import instaloader
 import time
@@ -9,12 +9,12 @@ TOKEN = "8627860845:AAEW8bKM4g70leQd6gYrns1o4ewcJOA2q2k"
 L = instaloader.Instaloader()
 monitoring = {}
 
-def is_active(username):
+def is_available(username):
     try:
         instaloader.Profile.from_username(L.context, username)
-        return False  # ❌ UNAVAILABLE
+        return False  # ❌ unavailable
     except:
-        return True   # 🟢 AVAILABLE
+        return True   # 🟢 available
 
 def format_time(seconds):
     hrs = seconds // 3600
@@ -30,7 +30,7 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = context.args[0]
     chat_id = update.effective_chat.id
 
-    current = is_active(username)
+    current = is_available(username)
 
     monitoring[username] = {
         "chat_id": chat_id,
@@ -40,11 +40,11 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if current:
         await update.message.reply_text(
-            f"❌ {username} unavailable\n👀 Monitoring started..."
+            f"🟢 {username} available\n👀 Monitoring started..."
         )
     else:
         await update.message.reply_text(
-            f"🟢 {username} available\n👀 Monitoring started..."
+            f"❌ {username} unavailable\n👀 Monitoring started..."
         )
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -64,7 +64,7 @@ async def monitor_loop(app):
     while True:
         for username in list(monitoring.keys()):
             data = monitoring[username]
-            current = is_active(username)
+            current = is_available(username)
 
             if current != data["last_status"]:
                 elapsed = int(time.time() - data["start_time"])
@@ -72,12 +72,12 @@ async def monitor_loop(app):
                 if current:
                     await app.bot.send_message(
                         data["chat_id"],
-                        f"🚫 {username} BANNED\n⏱ {format_time(elapsed)}"
+                        f"🏆 {username} UNBANNED 🎉\n⏱ {format_time(elapsed)}"
                     )
                 else:
                     await app.bot.send_message(
                         data["chat_id"],
-                        f"🏆 {username} UNBANNED 🎉\n⏱ {format_time(elapsed)}"
+                        f"🚫 {username} BANNED\n⏱ {format_time(elapsed)}"
                     )
 
                 data["last_status"] = current
@@ -85,15 +85,16 @@ async def monitor_loop(app):
 
         await asyncio.sleep(1)
 
-app = ApplicationBuilder().token(TOKEN).build()
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("check", check))
-app.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("check", check))
+    app.add_handler(CommandHandler("stop", stop))
 
-async def start_monitor(app):
     asyncio.create_task(monitor_loop(app))
 
-app.post_init = start_monitor
+    print("Dexthcrawl Monitor Running...")
+    await app.run_polling()
 
-print("Dexthcrawl Monitor Running...")
-app.run_polling()
+if __name__ == "__main__":
+    asyncio.run(main())
