@@ -12,9 +12,9 @@ monitoring = {}
 def is_active(username):
     try:
         instaloader.Profile.from_username(L.context, username)
-        return True  # unavailable
+        return False  # ❌ UNAVAILABLE
     except:
-        return False  # available
+        return True   # 🟢 AVAILABLE
 
 def format_time(seconds):
     hrs = seconds // 3600
