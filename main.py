@@ -12,9 +12,9 @@ monitoring = {}
 def is_available(username):
     try:
         instaloader.Profile.from_username(L.context, username)
-        return False  # ❌ unavailable
+        return False
     except:
-        return True   # 🟢 available
+        return True
 
 def format_time(seconds):
     hrs = seconds // 3600
@@ -85,16 +85,15 @@ async def monitor_loop(app):
 
         await asyncio.sleep(1)
 
-async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("check", check))
-    app.add_handler(CommandHandler("stop", stop))
-
+async def start_monitor(app):
     asyncio.create_task(monitor_loop(app))
 
-    print("Dexthcrawl Monitor Running...")
-    await app.run_polling()
+app = ApplicationBuilder().token(TOKEN).build()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+app.add_handler(CommandHandler("check", check))
+app.add_handler(CommandHandler("stop", stop))
+
+app.post_init = start_monitor
+
+print("Dexthcrawl Monitor Running...")
+app.run_polling()
